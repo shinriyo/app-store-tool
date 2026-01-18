@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Apple審査用画像ジェネレーター</title>
   <style>
-    /* ---- canvas size: iPhone 6.5" (1284x2778 portrait, 2778x1284 landscape) ---- */
+    /* ---- canvas size: iPhone 6.5" (1284x2778 portrait, 2778x1284 landscape) / iPad 12.9" (2048x2732 portrait, 2732x2048 landscape) ---- */
     :root {
       --w-portrait: 1284px;
       --h-portrait: 2778px;
@@ -716,6 +716,14 @@
       </div>
 
       <div class="control-group">
+        <label>デバイスサイズ</label>
+        <div class="orientation-selector">
+          <button type="button" class="orientation-btn active" data-device="iphone" id="device-iphone">📱 iPhone 6.5"</button>
+          <button type="button" class="orientation-btn" data-device="ipad" id="device-ipad">📱 iPad 12.9"</button>
+        </div>
+      </div>
+
+      <div class="control-group">
         <label>向き</label>
         <div class="orientation-selector">
           <button type="button" class="orientation-btn active" data-orientation="portrait" id="orientation-portrait">📱 縦向き</button>
@@ -723,7 +731,8 @@
         </div>
         <div style="margin-top: 8px; padding: 10px; background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 6px; font-size: 12px; color: rgba(255, 255, 255, 0.8); line-height: 1.5;">
           <strong>⚠️ 横向きゲームについて</strong><br>
-          • 横向き画像は横向きのままApp Storeにアップロードできます（サイズ: 2778×1284px）<br>
+          • 横向き画像は横向きのままApp Storeにアップロードできます<br>
+          • iPhone: 2778×1284px / iPad: 2732×2048px<br>
           • ただし、検索結果やサムネイルでは縦向きの枠に収まって表示されることがあります<br>
           • <strong>最初のスクリーンショット</strong>は検索結果で表示されるため、縦向きも混ぜることを推奨します<br>
           • 横向き画像は3分割されませんが、縦向きの枠内に縮小表示される可能性があります
@@ -753,7 +762,9 @@
         </div>
         <div style="margin-top: 6px; font-size: 11px; color: rgba(255, 255, 255, 0.6); line-height: 1.4;">
           💡 中に入れるスクリーンショット画像は任意のサイズでOK（自動調整されます）<br>
-          📦 保存される画像サイズ: 縦向き 1284×2778px / 横向き 2778×1284px（App Store用）<br>
+          📦 保存される画像サイズ（App Store用）:<br>
+          &nbsp;&nbsp;iPhone: 縦向き 1284×2778px / 横向き 2778×1284px<br>
+          &nbsp;&nbsp;iPad: 縦向き 2048×2732px / 横向き 2732×2048px<br>
           💾 画像はbase64データとして保存されるため、元のファイルを削除しても問題ありません<br>
           ⚠️ ただし、LocalStorageの容量制限（約5-10MB）に注意してください
         </div>
@@ -853,7 +864,12 @@
     const projectNameInput = document.getElementById('project-name');
     const orientationPortraitBtn = document.getElementById('orientation-portrait');
     const orientationLandscapeBtn = document.getElementById('orientation-landscape');
+    const deviceIphoneBtn = document.getElementById('device-iphone');
+    const deviceIpadBtn = document.getElementById('device-ipad');
     const projectModal = document.getElementById('project-modal');
+    
+    // デバイスサイズの状態
+    let currentDevice = 'iphone'; // 'iphone' or 'ipad'
     const modalClose = document.getElementById('modal-close');
     const projectList = document.getElementById('project-list');
     const emptyState = document.getElementById('empty-state');
@@ -871,14 +887,31 @@
       if (slides.length === 0) {
         slides = [createDefaultSlide()];
       }
+      currentSlideIndex = 0;
+      // デバイスサイズを初期化（保存はスキップ）
+      setDevice(slides[0].device || 'iphone', true);
       renderSlides();
-      loadSlide(0);
+      loadSlideData(slides[0]);
+    }
+
+    // デバイスサイズに応じたサイズを取得
+    function getDeviceSize(device, orientation) {
+      if (device === 'ipad') {
+        return orientation === 'landscape' 
+          ? { width: 2732, height: 2048 }
+          : { width: 2048, height: 2732 };
+      } else { // iphone
+        return orientation === 'landscape'
+          ? { width: 2778, height: 1284 }
+          : { width: 1284, height: 2778 };
+      }
     }
 
     // デフォルトスライドの作成
     function createDefaultSlide() {
       return {
         id: Date.now(),
+        device: 'iphone',
         orientation: 'portrait',
         kicker: "Your app's one-line benefit",
         title: "一瞬で<br>価値が伝わる",
@@ -892,6 +925,7 @@
     function getCurrentSlideData() {
       const orientation = shot.classList.contains('landscape') ? 'landscape' : 'portrait';
       return {
+        device: currentDevice,
         orientation: orientation,
         kicker: kickerInput.value || '',
         title: titleInput.value || '',
@@ -903,8 +937,43 @@
       };
     }
 
+    // デバイスサイズの切り替え
+    function setDevice(device, skipSave = false) {
+      currentDevice = device;
+      const orientation = shot.classList.contains('landscape') ? 'landscape' : 'portrait';
+      const size = getDeviceSize(device, orientation);
+      
+      // CSS変数を更新
+      document.documentElement.style.setProperty('--w-portrait', device === 'ipad' ? '2048px' : '1284px');
+      document.documentElement.style.setProperty('--h-portrait', device === 'ipad' ? '2732px' : '2778px');
+      document.documentElement.style.setProperty('--w-landscape', device === 'ipad' ? '2732px' : '2778px');
+      document.documentElement.style.setProperty('--h-landscape', device === 'ipad' ? '2048px' : '1284px');
+      
+      // ボタンの状態を更新
+      if (device === 'ipad') {
+        deviceIphoneBtn.classList.remove('active');
+        deviceIpadBtn.classList.add('active');
+      } else {
+        deviceIpadBtn.classList.remove('active');
+        deviceIphoneBtn.classList.add('active');
+      }
+      
+      // サイズを更新
+      updateShotSize(orientation);
+      if (!skipSave) {
+        saveCurrentSlide();
+      }
+    }
+
+    // ショットのサイズを更新
+    function updateShotSize(orientation) {
+      const size = getDeviceSize(currentDevice, orientation);
+      shot.style.width = size.width + 'px';
+      shot.style.height = size.height + 'px';
+    }
+
     // 向きの切り替え
-    function setOrientation(orientation) {
+    function setOrientation(orientation, skipSave = false) {
       if (orientation === 'landscape') {
         shot.classList.add('landscape');
         shot.classList.remove('portrait');
@@ -916,7 +985,10 @@
         orientationPortraitBtn.classList.add('active');
         orientationLandscapeBtn.classList.remove('active');
       }
-      saveCurrentSlide();
+      updateShotSize(orientation);
+      if (!skipSave) {
+        saveCurrentSlide();
+      }
     }
 
     // 初期化時にportraitクラスを設定
@@ -924,9 +996,13 @@
 
     // スライドデータをUIに反映
     function loadSlideData(slide) {
-      // 向きの設定
+      // デバイスサイズの設定（保存はスキップ）
+      const device = slide.device || 'iphone';
+      setDevice(device, true);
+      
+      // 向きの設定（保存はスキップ）
       const orientation = slide.orientation || 'portrait';
-      setOrientation(orientation);
+      setOrientation(orientation, true);
 
       kickerInput.value = slide.kicker || '';
       titleInput.value = slide.title || '';
@@ -963,10 +1039,18 @@
 
     // スライドの保存（現在の入力内容を保存）
     function saveCurrentSlide() {
-      if (slides[currentSlideIndex]) {
+      if (slides.length === 0) {
+        // スライドが存在しない場合は作成
+        slides = [createDefaultSlide()];
+        currentSlideIndex = 0;
+      }
+      
+      if (currentSlideIndex >= 0 && currentSlideIndex < slides.length) {
+        const currentData = getCurrentSlideData();
         slides[currentSlideIndex] = {
+          id: slides[currentSlideIndex].id || Date.now(),
           ...slides[currentSlideIndex],
-          ...getCurrentSlideData()
+          ...currentData
         };
       }
     }
@@ -975,7 +1059,9 @@
     function loadSlide(index) {
       if (index < 0 || index >= slides.length) return;
       
-      saveCurrentSlide(); // 現在のスライドを保存
+      // 現在のスライドを確実に保存（スライド1を含む）
+      saveCurrentSlide();
+      
       currentSlideIndex = index;
       loadSlideData(slides[index]);
       renderSlides();
@@ -1138,6 +1224,15 @@
     // スライド追加ボタン
     addSlideBtn.addEventListener('click', addSlide);
 
+    // デバイスサイズの切り替え
+    deviceIphoneBtn.addEventListener('click', () => {
+      setDevice('iphone');
+    });
+
+    deviceIpadBtn.addEventListener('click', () => {
+      setDevice('ipad');
+    });
+
     // 向きの切り替え
     orientationPortraitBtn.addEventListener('click', () => {
       setOrientation('portrait');
@@ -1203,12 +1298,21 @@
 
     // プロジェクトの保存
     saveBtn.addEventListener('click', () => {
+      // 現在表示中のスライドを確実に保存（スライド1を含む）
       saveCurrentSlide();
+      
+      // スライドが存在しない場合は作成
+      if (slides.length === 0) {
+        slides = [createDefaultSlide()];
+        currentSlideIndex = 0;
+        saveCurrentSlide();
+      }
+      
       const projectName = projectNameInput.value || '新規プロジェクト';
       const projectData = {
         id: Date.now(),
         name: projectName,
-        slides: slides,
+        slides: JSON.parse(JSON.stringify(slides)), // ディープコピー
         savedAt: new Date().toISOString()
       };
       
@@ -1286,12 +1390,12 @@
       saveCurrentSlide();
       try {
         const isLandscape = shot.classList.contains('landscape');
-        const width = isLandscape ? 2778 : 1284;
-        const height = isLandscape ? 1284 : 2778;
+        const orientation = isLandscape ? 'landscape' : 'portrait';
+        const size = getDeviceSize(currentDevice, orientation);
         
         const canvas = await html2canvas(shot, {
-          width: width,
-          height: height,
+          width: size.width,
+          height: size.height,
           scale: 2,
           useCORS: true,
           logging: false,
@@ -1299,8 +1403,8 @@
         });
 
         const link = document.createElement('a');
-        const orientation = isLandscape ? 'landscape' : 'portrait';
-        link.download = `app-store-screenshot-${orientation}-${currentSlideIndex + 1}-${Date.now()}.png`;
+        const deviceName = currentDevice === 'ipad' ? 'ipad' : 'iphone';
+        link.download = `app-store-screenshot-${deviceName}-${orientation}-${currentSlideIndex + 1}-${Date.now()}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
       } catch (error) {
@@ -1323,13 +1427,13 @@
           await new Promise(resolve => setTimeout(resolve, 500)); // レンダリング待機
           
           const isLandscape = shot.classList.contains('landscape');
-          const width = isLandscape ? 2778 : 1284;
-          const height = isLandscape ? 1284 : 2778;
           const orientation = isLandscape ? 'landscape' : 'portrait';
+          const slideDevice = slides[i].device || currentDevice;
+          const size = getDeviceSize(slideDevice, orientation);
           
           const canvas = await html2canvas(shot, {
-            width: width,
-            height: height,
+            width: size.width,
+            height: size.height,
             scale: 2,
             useCORS: true,
             logging: false,
@@ -1342,7 +1446,8 @@
           const base64Data = imageData.split(',')[1];
           
           // ZIPに追加
-          const filename = `screenshot-${orientation}-${String(i + 1).padStart(2, '0')}.png`;
+          const deviceName = slideDevice === 'ipad' ? 'ipad' : 'iphone';
+          const filename = `screenshot-${deviceName}-${orientation}-${String(i + 1).padStart(2, '0')}.png`;
           zip.file(filename, base64Data, { base64: true });
         }
         
