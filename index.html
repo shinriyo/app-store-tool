@@ -1,0 +1,1378 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Apple審査用画像ジェネレーター</title>
+  <style>
+    /* ---- canvas size: iPhone 6.5" (1284x2778 portrait, 2778x1284 landscape) ---- */
+    :root {
+      --w-portrait: 1284px;
+      --h-portrait: 2778px;
+      --w-landscape: 2778px;
+      --h-landscape: 1284px;
+
+      /* layout knobs */
+      --pad-x: 96px;
+      --pad-y: 80px;
+      --top-safe: 140px;
+      --title-gap: 28px;
+      --subtitle-gap: 44px;
+
+      /* colors */
+      --bg1: #0b1020;
+      --bg2: #1d2a6b;
+      --fg: #ffffff;
+      --muted: rgba(255,255,255,.78);
+      --card: rgba(255,255,255,.08);
+      --stroke: rgba(255,255,255,.14);
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #111;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   "Hiragino Sans", "Noto Sans JP", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    /* Control Panel */
+    .controls {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(17, 17, 17, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      z-index: 1000;
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+
+    .controls-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-group label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .control-group input,
+    .control-group textarea {
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .control-group input:focus,
+    .control-group textarea:focus {
+      outline: none;
+      border-color: rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .control-group textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    .file-input-wrapper {
+      position: relative;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      position: absolute;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .file-input-label {
+      display: block;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .file-input-label:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .file-input-label.has-file {
+      background: rgba(76, 175, 80, 0.2);
+      border-color: rgba(76, 175, 80, 0.4);
+    }
+
+    .btn {
+      padding: 12px 24px;
+      background: #007AFF;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn:hover {
+      background: #0051D5;
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-download {
+      background: #34C759;
+      grid-column: 1 / -1;
+      padding: 16px;
+      font-size: 16px;
+    }
+
+    .btn-download:hover {
+      background: #28A745;
+    }
+
+    .badge-inputs {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .badge-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .badge-input-row input {
+      flex: 1;
+    }
+
+    .btn-remove-badge {
+      padding: 10px 16px;
+      background: rgba(255, 59, 48, 0.2);
+      border: 1px solid rgba(255, 59, 48, 0.4);
+      color: #ff3b30;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .btn-remove-badge:hover {
+      background: rgba(255, 59, 48, 0.3);
+    }
+
+    .btn-add-badge {
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .btn-add-badge:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Slide Management */
+    .slide-management {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .slides-container {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .slide-item {
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .slide-item:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .slide-item.active {
+      background: #007AFF;
+      border-color: #007AFF;
+    }
+
+    .slide-item .remove-slide {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 20px;
+      height: 20px;
+      background: rgba(255, 59, 48, 0.9);
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .slide-item .remove-slide:hover {
+      background: #ff3b30;
+    }
+
+    .btn-add-slide {
+      padding: 8px 16px;
+      background: rgba(52, 199, 89, 0.2);
+      border: 1px solid rgba(52, 199, 89, 0.4);
+      color: #34C759;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .btn-add-slide:hover {
+      background: rgba(52, 199, 89, 0.3);
+    }
+
+    /* Save/Load Controls */
+    .save-load-controls {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn-save {
+      background: #AF52DE;
+    }
+
+    .btn-save:hover {
+      background: #9A3FC8;
+    }
+
+    .btn-load {
+      background: #FF9500;
+    }
+
+    .btn-load:hover {
+      background: #E6850E;
+    }
+
+    .btn-download-all {
+      background: #5856D6;
+    }
+
+    .btn-download-all:hover {
+      background: #4846C6;
+    }
+
+    .project-name-input {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    /* Project List Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #1a1a1a;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+
+    .modal-close:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .project-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .project-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .project-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .project-info {
+      flex: 1;
+    }
+
+    .project-name-display {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .project-meta {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .project-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-project {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-load-project {
+      background: #007AFF;
+      color: #fff;
+    }
+
+    .btn-load-project:hover {
+      background: #0051D5;
+    }
+
+    .btn-delete-project {
+      background: rgba(255, 59, 48, 0.2);
+      color: #ff3b30;
+      border: 1px solid rgba(255, 59, 48, 0.4);
+    }
+
+    .btn-delete-project:hover {
+      background: rgba(255, 59, 48, 0.3);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    /* Orientation Selector */
+    .orientation-selector {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .orientation-btn {
+      padding: 10px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+    }
+
+    .orientation-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .orientation-btn.active {
+      background: #007AFF;
+      border-color: #007AFF;
+    }
+
+    /* Landscape Layout */
+    .shot.landscape {
+      width: var(--w-landscape);
+      height: var(--h-landscape);
+    }
+
+    .shot.landscape .content {
+      flex-direction: row;
+      align-items: center;
+      padding: var(--pad-y) var(--pad-x);
+      gap: 60px;
+    }
+
+    .text-content {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .shot.landscape .text-content {
+      flex: 1;
+      max-width: 800px;
+    }
+
+    .shot.landscape .stage {
+      margin-top: 0;
+      flex: 1;
+      max-width: 2000px;
+      padding-bottom: 0;
+    }
+
+    .shot.landscape .frame {
+      width: 100%;
+      max-width: 2000px;
+      height: 1000px;
+    }
+
+    .shot.landscape .badges {
+      position: static;
+      margin-top: 40px;
+      justify-content: flex-start;
+    }
+
+    .shot.landscape .kicker {
+      font-size: 36px;
+    }
+
+    .shot.landscape .title {
+      font-size: 88px;
+      margin-top: var(--title-gap);
+    }
+
+    .shot.landscape .subtitle {
+      font-size: 42px;
+      margin-top: var(--subtitle-gap);
+    }
+
+    /* The export surface */
+    .shot {
+      width: var(--w-portrait);
+      height: var(--h-portrait);
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(1200px 1200px at 20% 10%, rgba(255,255,255,.10), transparent 55%),
+                  linear-gradient(160deg, var(--bg1), var(--bg2));
+      color: var(--fg);
+    }
+
+    /* subtle noise-like overlay (optional) */
+    .shot::after {
+      content: "";
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(255,255,255,.02) 0px,
+        rgba(255,255,255,.02) 1px,
+        transparent 2px,
+        transparent 6px
+      );
+      opacity: .35;
+      pointer-events: none;
+      mix-blend-mode: overlay;
+    }
+
+    .content {
+      position: absolute;
+      inset: 0;
+      padding: var(--top-safe) var(--pad-x) 0 var(--pad-x);
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .kicker {
+      font-size: 44px;
+      letter-spacing: .02em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .title {
+      margin-top: var(--title-gap);
+      font-size: 112px;
+      line-height: 1.06;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      margin-top: var(--subtitle-gap);
+      font-size: 52px;
+      line-height: 1.25;
+      color: var(--muted);
+      max-width: 980px;
+      font-weight: 650;
+    }
+
+    /* App UI area */
+    .stage {
+      margin-top: 96px;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr;
+      align-items: end;
+      justify-items: center;
+      padding-bottom: 120px;
+    }
+
+    /* A “device-ish” card frame */
+    .frame {
+      width: 1020px;
+      height: 1740px;
+      border-radius: 84px;
+      background: var(--card);
+      border: 1px solid var(--stroke);
+      box-shadow: 0 40px 120px rgba(0,0,0,.45);
+      padding: 22px;
+      position: relative;
+    }
+
+    /* Screen image */
+    .frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+      border-radius: 62px;
+      display: block;
+      background: rgba(0,0,0,.25);
+    }
+
+    /* Bottom badges (optional) */
+    .badges {
+      position: absolute;
+      left: var(--pad-x);
+      right: var(--pad-x);
+      bottom: 80px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .badge {
+      padding: 18px 26px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.18);
+      font-size: 34px;
+      font-weight: 750;
+      color: rgba(255,255,255,.92);
+      backdrop-filter: blur(8px);
+    }
+
+    /* For dev preview in browser center */
+    .wrap {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      padding-top: calc(50vh + 24px);
+    }
+
+    .preview-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 62px;
+      display: block;
+      background: rgba(0,0,0,.25);
+    }
+
+    .preview-image-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,.25);
+      border-radius: 62px;
+      color: rgba(255,255,255,.5);
+      font-size: 18px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="controls">
+    <div class="controls-inner">
+      <!-- Slide Management -->
+      <div class="slide-management">
+        <div class="slides-container" id="slides-container"></div>
+        <button type="button" class="btn-add-slide" id="add-slide-btn">+ スライド追加</button>
+      </div>
+
+      <!-- Save/Load Controls -->
+      <div class="save-load-controls">
+        <input type="text" class="project-name-input" id="project-name" placeholder="プロジェクト名" value="新規プロジェクト" style="padding: 10px 12px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; color: #fff; font-size: 14px; font-family: inherit;">
+        <button type="button" class="btn btn-save" id="save-btn">💾 保存</button>
+        <button type="button" class="btn btn-load" id="load-btn">📂 プロジェクト一覧</button>
+      </div>
+
+      <div class="control-group">
+        <label>向き</label>
+        <div class="orientation-selector">
+          <button type="button" class="orientation-btn active" data-orientation="portrait" id="orientation-portrait">📱 縦向き</button>
+          <button type="button" class="orientation-btn" data-orientation="landscape" id="orientation-landscape">🖼️ 横向き</button>
+        </div>
+        <div style="margin-top: 8px; padding: 10px; background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 6px; font-size: 12px; color: rgba(255, 255, 255, 0.8); line-height: 1.5;">
+          <strong>⚠️ 横向きゲームについて</strong><br>
+          • 横向き画像は横向きのままApp Storeにアップロードできます（サイズ: 2778×1284px）<br>
+          • ただし、検索結果やサムネイルでは縦向きの枠に収まって表示されることがあります<br>
+          • <strong>最初のスクリーンショット</strong>は検索結果で表示されるため、縦向きも混ぜることを推奨します<br>
+          • 横向き画像は3分割されませんが、縦向きの枠内に縮小表示される可能性があります
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Kicker（一行のメリット）</label>
+        <input type="text" id="kicker" placeholder="Your app's one-line benefit" value="Your app's one-line benefit">
+      </div>
+
+      <div class="control-group">
+        <label>タイトル</label>
+        <textarea id="title" placeholder="タイトル（改行可）">一瞬で<br>価値が伝わる</textarea>
+      </div>
+
+      <div class="control-group">
+        <label>サブタイトル</label>
+        <textarea id="subtitle" placeholder="説明文（改行可）">ここに短い説明文（1〜2行）。<br>「何ができるか」を具体的に。</textarea>
+      </div>
+
+      <div class="control-group">
+        <label>スクリーンショット画像</label>
+        <div class="file-input-wrapper">
+          <input type="file" id="screenshot" accept="image/*">
+          <label for="screenshot" class="file-input-label" id="file-label">画像を選択</label>
+        </div>
+        <div style="margin-top: 6px; font-size: 11px; color: rgba(255, 255, 255, 0.6); line-height: 1.4;">
+          💡 中に入れるスクリーンショット画像は任意のサイズでOK（自動調整されます）<br>
+          📦 保存される画像サイズ: 縦向き 1284×2778px / 横向き 2778×1284px（App Store用）<br>
+          💾 画像はbase64データとして保存されるため、元のファイルを削除しても問題ありません<br>
+          ⚠️ ただし、LocalStorageの容量制限（約5-10MB）に注意してください
+        </div>
+      </div>
+
+      <div class="control-group badge-inputs">
+        <label>バッジ（複数可）</label>
+        <div id="badge-inputs-container">
+          <div class="badge-input-row">
+            <input type="text" class="badge-input" placeholder="バッジテキスト" value="高速">
+            <button type="button" class="btn-remove-badge">削除</button>
+          </div>
+          <div class="badge-input-row">
+            <input type="text" class="badge-input" placeholder="バッジテキスト" value="シンプル">
+            <button type="button" class="btn-remove-badge">削除</button>
+          </div>
+          <div class="badge-input-row">
+            <input type="text" class="badge-input" placeholder="バッジテキスト" value="オフライン対応">
+            <button type="button" class="btn-remove-badge">削除</button>
+          </div>
+        </div>
+        <button type="button" class="btn-add-badge" id="add-badge">+ バッジを追加</button>
+      </div>
+
+      <button type="button" class="btn btn-download" id="download-btn">📥 このスライドをダウンロード</button>
+      <button type="button" class="btn btn-download-all" id="download-all-btn">📦 全スライドをZIPでダウンロード</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="shot" id="shot">
+      <div class="content">
+        <div class="text-content">
+          <div class="kicker" id="kicker-display">Your app's one-line benefit</div>
+          <div class="title" id="title-display">一瞬で<br>価値が伝わる</div>
+          <div class="subtitle" id="subtitle-display">
+            ここに短い説明文（1〜2行）。<br>
+            「何ができるか」を具体的に。
+          </div>
+          <div class="badges" id="badges-display">
+            <div class="badge">高速</div>
+            <div class="badge">シンプル</div>
+            <div class="badge">オフライン対応</div>
+          </div>
+        </div>
+
+        <div class="stage">
+          <div class="frame">
+            <div class="preview-image-placeholder" id="image-placeholder">スクリーンショットを選択してください</div>
+            <img id="preview-image" class="preview-image" style="display: none;" alt="App UI screenshot">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project List Modal -->
+  <div class="modal" id="project-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">保存されたプロジェクト</h2>
+        <button class="modal-close" id="modal-close">×</button>
+      </div>
+      <div class="project-list" id="project-list">
+        <!-- プロジェクト一覧がここに表示されます -->
+      </div>
+      <div class="empty-state" id="empty-state" style="display: none;">
+        保存されたプロジェクトがありません
+      </div>
+      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 12px; color: rgba(255,255,255,0.6);">
+        💡 保存データはブラウザのLocalStorageに保存されています<br>
+        ブラウザのデータを削除すると、保存したプロジェクトも削除されます
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // スライドデータ管理
+    let slides = [];
+    let currentSlideIndex = 0;
+
+    // DOM要素の取得
+    const kickerInput = document.getElementById('kicker');
+    const titleInput = document.getElementById('title');
+    const subtitleInput = document.getElementById('subtitle');
+    const screenshotInput = document.getElementById('screenshot');
+    const fileLabel = document.getElementById('file-label');
+    const downloadBtn = document.getElementById('download-btn');
+    const downloadAllBtn = document.getElementById('download-all-btn');
+    const addBadgeBtn = document.getElementById('add-badge');
+    const badgeInputsContainer = document.getElementById('badge-inputs-container');
+    const shot = document.getElementById('shot');
+    const slidesContainer = document.getElementById('slides-container');
+    const addSlideBtn = document.getElementById('add-slide-btn');
+    const saveBtn = document.getElementById('save-btn');
+    const loadBtn = document.getElementById('load-btn');
+    const projectNameInput = document.getElementById('project-name');
+    const orientationPortraitBtn = document.getElementById('orientation-portrait');
+    const orientationLandscapeBtn = document.getElementById('orientation-landscape');
+    const projectModal = document.getElementById('project-modal');
+    const modalClose = document.getElementById('modal-close');
+    const projectList = document.getElementById('project-list');
+    const emptyState = document.getElementById('empty-state');
+
+    // 表示用要素
+    const kickerDisplay = document.getElementById('kicker-display');
+    const titleDisplay = document.getElementById('title-display');
+    const subtitleDisplay = document.getElementById('subtitle-display');
+    const badgesDisplay = document.getElementById('badges-display');
+    const previewImage = document.getElementById('preview-image');
+    const imagePlaceholder = document.getElementById('image-placeholder');
+
+    // スライドデータの初期化
+    function initSlides() {
+      if (slides.length === 0) {
+        slides = [createDefaultSlide()];
+      }
+      renderSlides();
+      loadSlide(0);
+    }
+
+    // デフォルトスライドの作成
+    function createDefaultSlide() {
+      return {
+        id: Date.now(),
+        orientation: 'portrait',
+        kicker: "Your app's one-line benefit",
+        title: "一瞬で<br>価値が伝わる",
+        subtitle: "ここに短い説明文（1〜2行）。<br>「何ができるか」を具体的に。",
+        image: null,
+        badges: ["高速", "シンプル", "オフライン対応"]
+      };
+    }
+
+    // 現在のスライドデータを取得
+    function getCurrentSlideData() {
+      const orientation = shot.classList.contains('landscape') ? 'landscape' : 'portrait';
+      return {
+        orientation: orientation,
+        kicker: kickerInput.value || '',
+        title: titleInput.value || '',
+        subtitle: subtitleInput.value || '',
+        image: previewImage.src || null,
+        badges: Array.from(badgeInputsContainer.querySelectorAll('.badge-input'))
+          .map(input => input.value.trim())
+          .filter(v => v)
+      };
+    }
+
+    // 向きの切り替え
+    function setOrientation(orientation) {
+      if (orientation === 'landscape') {
+        shot.classList.add('landscape');
+        shot.classList.remove('portrait');
+        orientationPortraitBtn.classList.remove('active');
+        orientationLandscapeBtn.classList.add('active');
+      } else {
+        shot.classList.remove('landscape');
+        shot.classList.add('portrait');
+        orientationPortraitBtn.classList.add('active');
+        orientationLandscapeBtn.classList.remove('active');
+      }
+      saveCurrentSlide();
+    }
+
+    // 初期化時にportraitクラスを設定
+    shot.classList.add('portrait');
+
+    // スライドデータをUIに反映
+    function loadSlideData(slide) {
+      // 向きの設定
+      const orientation = slide.orientation || 'portrait';
+      setOrientation(orientation);
+
+      kickerInput.value = slide.kicker || '';
+      titleInput.value = slide.title || '';
+      subtitleInput.value = slide.subtitle || '';
+      
+      // バッジ入力の更新
+      badgeInputsContainer.innerHTML = '';
+      if (slide.badges && slide.badges.length > 0) {
+        slide.badges.forEach(badge => {
+          addBadgeInput(badge);
+        });
+      } else {
+        addBadgeInput('');
+      }
+
+      // 画像の更新
+      if (slide.image) {
+        previewImage.src = slide.image;
+        previewImage.style.display = 'block';
+        imagePlaceholder.style.display = 'none';
+        fileLabel.textContent = '画像が設定されています';
+        fileLabel.classList.add('has-file');
+      } else {
+        previewImage.src = '';
+        previewImage.style.display = 'none';
+        imagePlaceholder.style.display = 'flex';
+        fileLabel.textContent = '画像を選択';
+        fileLabel.classList.remove('has-file');
+      }
+
+      // 表示の更新
+      updateDisplay();
+    }
+
+    // スライドの保存（現在の入力内容を保存）
+    function saveCurrentSlide() {
+      if (slides[currentSlideIndex]) {
+        slides[currentSlideIndex] = {
+          ...slides[currentSlideIndex],
+          ...getCurrentSlideData()
+        };
+      }
+    }
+
+    // スライドの読み込み
+    function loadSlide(index) {
+      if (index < 0 || index >= slides.length) return;
+      
+      saveCurrentSlide(); // 現在のスライドを保存
+      currentSlideIndex = index;
+      loadSlideData(slides[index]);
+      renderSlides();
+    }
+
+    // スライドの追加
+    function addSlide() {
+      saveCurrentSlide();
+      const newSlide = createDefaultSlide();
+      slides.push(newSlide);
+      currentSlideIndex = slides.length - 1;
+      loadSlideData(newSlide);
+      renderSlides();
+    }
+
+    // スライドの削除
+    function removeSlide(index) {
+      if (slides.length <= 1) {
+        alert('最低1つのスライドが必要です。');
+        return;
+      }
+      
+      if (confirm('このスライドを削除しますか？')) {
+        slides.splice(index, 1);
+        if (currentSlideIndex >= slides.length) {
+          currentSlideIndex = slides.length - 1;
+        }
+        loadSlide(currentSlideIndex);
+      }
+    }
+
+    // スライド一覧の表示
+    function renderSlides() {
+      slidesContainer.innerHTML = '';
+      slides.forEach((slide, index) => {
+        const slideItem = document.createElement('div');
+        slideItem.className = `slide-item ${index === currentSlideIndex ? 'active' : ''}`;
+        slideItem.textContent = `スライド ${index + 1}`;
+        slideItem.onclick = () => loadSlide(index);
+        
+        if (slides.length > 1) {
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'remove-slide';
+          removeBtn.textContent = '×';
+          removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            removeSlide(index);
+          };
+          slideItem.appendChild(removeBtn);
+        }
+        
+        slidesContainer.appendChild(slideItem);
+      });
+    }
+
+    // バッジ入力の追加
+    function addBadgeInput(value = '') {
+      const row = document.createElement('div');
+      row.className = 'badge-input-row';
+      row.innerHTML = `
+        <input type="text" class="badge-input" placeholder="バッジテキスト" value="${value}">
+        <button type="button" class="btn-remove-badge">削除</button>
+      `;
+      badgeInputsContainer.appendChild(row);
+      
+      const removeBtn = row.querySelector('.btn-remove-badge');
+      const input = row.querySelector('.badge-input');
+      
+      removeBtn.addEventListener('click', () => {
+        row.remove();
+        updateBadges();
+        saveCurrentSlide();
+      });
+      
+      input.addEventListener('input', () => {
+        updateBadges();
+        saveCurrentSlide();
+      });
+    }
+
+    // 表示の更新
+    function updateDisplay() {
+      kickerDisplay.textContent = kickerInput.value || 'Your app\'s one-line benefit';
+      const titleText = titleInput.value || '一瞬で<br>価値が伝わる';
+      titleDisplay.innerHTML = titleText.replace(/\n/g, '<br>');
+      const subtitleText = subtitleInput.value || 'ここに短い説明文（1〜2行）。<br>「何ができるか」を具体的に。';
+      subtitleDisplay.innerHTML = subtitleText.replace(/\n/g, '<br>');
+      updateBadges();
+    }
+
+    // テキスト入力の更新
+    kickerInput.addEventListener('input', () => {
+      updateDisplay();
+      saveCurrentSlide();
+    });
+
+    titleInput.addEventListener('input', () => {
+      updateDisplay();
+      saveCurrentSlide();
+    });
+
+    subtitleInput.addEventListener('input', () => {
+      updateDisplay();
+      saveCurrentSlide();
+    });
+
+    // 画像選択
+    screenshotInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          previewImage.src = event.target.result;
+          previewImage.style.display = 'block';
+          imagePlaceholder.style.display = 'none';
+          fileLabel.textContent = file.name;
+          fileLabel.classList.add('has-file');
+          saveCurrentSlide();
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // バッジの追加
+    addBadgeBtn.addEventListener('click', () => {
+      addBadgeInput();
+    });
+
+    // バッジの削除
+    badgeInputsContainer.addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-remove-badge')) {
+        e.target.closest('.badge-input-row').remove();
+        updateBadges();
+        saveCurrentSlide();
+      }
+    });
+
+    // バッジ入力の更新
+    badgeInputsContainer.addEventListener('input', (e) => {
+      if (e.target.classList.contains('badge-input')) {
+        updateBadges();
+        saveCurrentSlide();
+      }
+    });
+
+    // バッジ表示の更新
+    function updateBadges() {
+      const inputs = badgeInputsContainer.querySelectorAll('.badge-input');
+      badgesDisplay.innerHTML = '';
+      inputs.forEach(input => {
+        if (input.value.trim()) {
+          const badge = document.createElement('div');
+          badge.className = 'badge';
+          badge.textContent = input.value.trim();
+          badgesDisplay.appendChild(badge);
+        }
+      });
+    }
+
+    // スライド追加ボタン
+    addSlideBtn.addEventListener('click', addSlide);
+
+    // 向きの切り替え
+    orientationPortraitBtn.addEventListener('click', () => {
+      setOrientation('portrait');
+    });
+
+    orientationLandscapeBtn.addEventListener('click', () => {
+      setOrientation('landscape');
+    });
+
+    // プロジェクト一覧の取得
+    function getAllProjects() {
+      const projectsJson = localStorage.getItem('appStoreGenerator_projects');
+      return projectsJson ? JSON.parse(projectsJson) : [];
+    }
+
+    // プロジェクト一覧の保存
+    function saveAllProjects(projects) {
+      localStorage.setItem('appStoreGenerator_projects', JSON.stringify(projects));
+    }
+
+    // プロジェクト一覧の表示
+    function renderProjectList() {
+      const projects = getAllProjects();
+      projectList.innerHTML = '';
+      
+      if (projects.length === 0) {
+        emptyState.style.display = 'block';
+        projectList.style.display = 'none';
+      } else {
+        emptyState.style.display = 'none';
+        projectList.style.display = 'flex';
+        
+        projects.forEach((project, index) => {
+          const item = document.createElement('div');
+          item.className = 'project-item';
+          
+          const savedDate = new Date(project.savedAt);
+          const dateStr = savedDate.toLocaleString('ja-JP', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          
+          item.innerHTML = `
+            <div class="project-info">
+              <div class="project-name-display">${project.name}</div>
+              <div class="project-meta">
+                スライド数: ${project.slides.length}枚 | 保存日時: ${dateStr}
+              </div>
+            </div>
+            <div class="project-actions">
+              <button class="btn-project btn-load-project" data-index="${index}">読み込み</button>
+              <button class="btn-project btn-delete-project" data-index="${index}">削除</button>
+            </div>
+          `;
+          
+          projectList.appendChild(item);
+        });
+      }
+    }
+
+    // プロジェクトの保存
+    saveBtn.addEventListener('click', () => {
+      saveCurrentSlide();
+      const projectName = projectNameInput.value || '新規プロジェクト';
+      const projectData = {
+        id: Date.now(),
+        name: projectName,
+        slides: slides,
+        savedAt: new Date().toISOString()
+      };
+      
+      const projects = getAllProjects();
+      
+      // 同じ名前のプロジェクトがあるかチェック
+      const existingIndex = projects.findIndex(p => p.name === projectName);
+      if (existingIndex >= 0) {
+        if (confirm(`「${projectName}」という名前のプロジェクトが既に存在します。上書きしますか？`)) {
+          projects[existingIndex] = projectData;
+        } else {
+          return;
+        }
+      } else {
+        projects.push(projectData);
+      }
+      
+      saveAllProjects(projects);
+      alert('プロジェクトを保存しました！');
+    });
+
+    // プロジェクト一覧モーダルの表示
+    loadBtn.addEventListener('click', () => {
+      renderProjectList();
+      projectModal.classList.add('active');
+    });
+
+    // モーダルを閉じる
+    modalClose.addEventListener('click', () => {
+      projectModal.classList.remove('active');
+    });
+
+    projectModal.addEventListener('click', (e) => {
+      if (e.target === projectModal) {
+        projectModal.classList.remove('active');
+      }
+    });
+
+    // プロジェクトの読み込み
+    projectList.addEventListener('click', (e) => {
+      const index = e.target.getAttribute('data-index');
+      if (!index) return;
+      
+      if (e.target.classList.contains('btn-load-project')) {
+        const projects = getAllProjects();
+        const project = projects[parseInt(index)];
+        
+        if (confirm('現在のプロジェクトを上書きして読み込みますか？')) {
+          try {
+            slides = project.slides || [createDefaultSlide()];
+            projectNameInput.value = project.name || '新規プロジェクト';
+            currentSlideIndex = 0;
+            loadSlide(0);
+            projectModal.classList.remove('active');
+            alert('プロジェクトを読み込みました！');
+          } catch (error) {
+            alert('プロジェクトの読み込みに失敗しました。');
+            console.error(error);
+          }
+        }
+      } else if (e.target.classList.contains('btn-delete-project')) {
+        const projects = getAllProjects();
+        const project = projects[parseInt(index)];
+        
+        if (confirm(`「${project.name}」を削除しますか？この操作は取り消せません。`)) {
+          projects.splice(parseInt(index), 1);
+          saveAllProjects(projects);
+          renderProjectList();
+        }
+      }
+    });
+
+    // 画像ダウンロード（現在のスライド）
+    downloadBtn.addEventListener('click', async () => {
+      saveCurrentSlide();
+      try {
+        const isLandscape = shot.classList.contains('landscape');
+        const width = isLandscape ? 2778 : 1284;
+        const height = isLandscape ? 1284 : 2778;
+        
+        const canvas = await html2canvas(shot, {
+          width: width,
+          height: height,
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#0b1020'
+        });
+
+        const link = document.createElement('a');
+        const orientation = isLandscape ? 'landscape' : 'portrait';
+        link.download = `app-store-screenshot-${orientation}-${currentSlideIndex + 1}-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } catch (error) {
+        console.error('画像生成エラー:', error);
+        alert('画像の生成に失敗しました。html2canvasライブラリが必要です。');
+      }
+    });
+
+    // 全スライドダウンロード（ZIP形式）
+    downloadAllBtn.addEventListener('click', async () => {
+      saveCurrentSlide();
+      const currentIndex = currentSlideIndex;
+      
+      try {
+        const zip = new JSZip();
+        const timestamp = Date.now();
+        
+        for (let i = 0; i < slides.length; i++) {
+          loadSlide(i);
+          await new Promise(resolve => setTimeout(resolve, 500)); // レンダリング待機
+          
+          const isLandscape = shot.classList.contains('landscape');
+          const width = isLandscape ? 2778 : 1284;
+          const height = isLandscape ? 1284 : 2778;
+          const orientation = isLandscape ? 'landscape' : 'portrait';
+          
+          const canvas = await html2canvas(shot, {
+            width: width,
+            height: height,
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#0b1020'
+          });
+
+          // 画像をbase64に変換
+          const imageData = canvas.toDataURL('image/png');
+          // base64のデータ部分を取得（data:image/png;base64, を除く）
+          const base64Data = imageData.split(',')[1];
+          
+          // ZIPに追加
+          const filename = `screenshot-${orientation}-${String(i + 1).padStart(2, '0')}.png`;
+          zip.file(filename, base64Data, { base64: true });
+        }
+        
+        // ZIPファイルを生成してダウンロード
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const link = document.createElement('a');
+        link.download = `app-store-screenshots-${timestamp}.zip`;
+        link.href = URL.createObjectURL(zipBlob);
+        link.click();
+        
+        // メモリを解放
+        URL.revokeObjectURL(link.href);
+        
+        loadSlide(currentIndex); // 元のスライドに戻す
+        alert(`${slides.length}枚の画像をZIPファイルにまとめてダウンロードしました！`);
+      } catch (error) {
+        console.error('画像生成エラー:', error);
+        alert('画像の生成に失敗しました。JSZipライブラリが必要です。');
+        loadSlide(currentIndex);
+      }
+    });
+
+    // 初期化
+    initSlides();
+  </script>
+
+  <!-- html2canvas library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <!-- JSZip library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</body>
+</html>
+
