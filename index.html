@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="ja">
-<head>
+  <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Apple審査用画像ジェネレーター</title>
   <style>
-    /* ---- canvas size: iPhone 6.5" (1284x2778 portrait, 2778x1284 landscape) / iPad 12.9" (2048x2732 portrait, 2732x2048 landscape) ---- */
+    /* ---- canvas size: iPhone 6.5" (1284x2778 portrait, 2778x1284 landscape) / iPad 12.9" (2064x2752 portrait, 2752x2064 landscape) ---- */
     :root {
       --w-portrait: 1284px;
       --h-portrait: 2778px;
@@ -100,6 +100,24 @@
 
     .file-input-wrapper {
       position: relative;
+    }
+
+    .screenshot-inputs-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .screenshot-inputs-row .file-input-wrapper {
+      flex: 1;
+      min-width: 140px;
+    }
+
+    .device-label {
+      display: block;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 4px;
     }
 
     .file-input-wrapper input[type="file"] {
@@ -502,10 +520,34 @@
     }
 
     .shot.landscape .content {
-      flex-direction: row;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      grid-template-rows: auto auto 1fr;
       align-items: center;
       padding: var(--pad-y) var(--pad-x);
-      gap: 60px;
+      gap: 0 60px;
+    }
+
+    .shot.landscape .text-content {
+      grid-column: 1;
+      grid-row: 1;
+      max-width: 800px;
+    }
+
+    .shot.landscape .stage {
+      grid-column: 2;
+      grid-row: 1 / -1;
+      margin-top: 0;
+      max-width: 2000px;
+      padding-bottom: 0;
+    }
+
+    .shot.landscape .badges {
+      grid-column: 1;
+      grid-row: 2;
+      margin-top: 40px;
+      padding-bottom: 0;
+      justify-content: flex-start;
     }
 
     .text-content {
@@ -513,28 +555,10 @@
       flex-direction: column;
     }
 
-    .shot.landscape .text-content {
-      flex: 1;
-      max-width: 800px;
-    }
-
-    .shot.landscape .stage {
-      margin-top: 0;
-      flex: 1;
-      max-width: 2000px;
-      padding-bottom: 0;
-    }
-
     .shot.landscape .frame {
       width: 100%;
       max-width: 2000px;
       height: 1000px;
-    }
-
-    .shot.landscape .badges {
-      position: static;
-      margin-top: 40px;
-      justify-content: flex-start;
     }
 
     .shot.landscape .kicker {
@@ -581,7 +605,7 @@
     .content {
       position: absolute;
       inset: 0;
-      padding: var(--top-safe) var(--pad-x) 0 var(--pad-x);
+      padding: var(--top-safe) var(--pad-x) var(--pad-x) var(--pad-x);
       display: flex;
       flex-direction: column;
       gap: 0;
@@ -611,46 +635,68 @@
       font-weight: 650;
     }
 
-    /* App UI area */
+    /* ステージは「テキストとバッジの間」だけ。中身は必ずこの高さに収める＝プレビューで被らない */
     .stage {
       margin-top: 96px;
       flex: 1;
+      min-height: 0;
       display: grid;
       grid-template-columns: 1fr;
-      align-items: end;
+      grid-template-rows: 1fr;
+      align-items: center;
       justify-items: center;
-      padding-bottom: 120px;
+      padding-bottom: 0;
+    }
+
+    /* iPad のときは .content の padding-bottom の上までしか使わない（バッジと絶対に重ならない） */
+    .shot.device-ipad .stage {
+      margin-top: 72px;
+      padding-bottom: 0;
+      flex: 1;
+      min-height: 0;
+      align-items: center;
+      justify-items: center;
     }
 
     /* A “device-ish” card frame */
     .frame {
       width: 1020px;
       height: 1740px;
+      max-width: 100%;
+      max-height: 100%;
       border-radius: 84px;
       background: var(--card);
       border: 1px solid var(--stroke);
       box-shadow: 0 40px 120px rgba(0,0,0,.45);
       padding: 22px;
       position: relative;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    /* iPad のときは画像の実寸比でフレームを決める（JS で aspect-ratio をセット） */
+    .shot.device-ipad.portrait .frame {
+      height: 100%;
+      width: auto;
+      border-radius: 72px;
     }
 
     /* Screen image */
     .frame img {
       width: 100%;
       height: 100%;
-      object-fit: contain;
+      object-fit: contain;      /* 元画像の縦横比を維持してフレーム内に収める（はみ出さない） */
       object-position: center;
       border-radius: 62px;
       display: block;
       background: rgba(0,0,0,.25);
     }
 
-    /* Bottom badges (optional) */
+    /* バッジは常にフロー内の最下部（スクショの下）。絶対配置にしないので被らない */
     .badges {
-      position: absolute;
-      left: var(--pad-x);
-      right: var(--pad-x);
-      bottom: 80px;
+      flex-shrink: 0;
+      margin-top: 24px;
+      padding-bottom: 24px;
       display: flex;
       gap: 20px;
       flex-wrap: wrap;
@@ -756,15 +802,23 @@
 
       <div class="control-group">
         <label>スクリーンショット画像</label>
-        <div class="file-input-wrapper">
-          <input type="file" id="screenshot" accept="image/*">
-          <label for="screenshot" class="file-input-label" id="file-label">画像を選択</label>
+        <div class="screenshot-inputs-row">
+          <div class="file-input-wrapper">
+            <span class="device-label">iPhone用</span>
+            <input type="file" id="screenshot-iphone" accept="image/*">
+            <label for="screenshot-iphone" class="file-input-label" id="file-label-iphone">画像を選択</label>
+          </div>
+          <div class="file-input-wrapper">
+            <span class="device-label">iPad用</span>
+            <input type="file" id="screenshot-ipad" accept="image/*">
+            <label for="screenshot-ipad" class="file-input-label" id="file-label-ipad">画像を選択</label>
+          </div>
         </div>
         <div style="margin-top: 6px; font-size: 11px; color: rgba(255, 255, 255, 0.6); line-height: 1.4;">
-          💡 中に入れるスクリーンショット画像は任意のサイズでOK（自動調整されます）<br>
+          💡 iPhoneとiPadで別々の画像を設定できます（任意のサイズでOK・自動調整）<br>
           📦 保存される画像サイズ（App Store用）:<br>
           &nbsp;&nbsp;iPhone: 縦向き 1284×2778px / 横向き 2778×1284px<br>
-          &nbsp;&nbsp;iPad: 縦向き 2048×2732px / 横向き 2732×2048px<br>
+          &nbsp;&nbsp;iPad: 縦向き 2064×2752px / 横向き 2752×2064px<br>
           💾 画像はbase64データとして保存されるため、元のファイルを削除しても問題ありません<br>
           ⚠️ ただし、LocalStorageの容量制限（約5-10MB）に注意してください
         </div>
@@ -804,18 +858,19 @@
             ここに短い説明文（1〜2行）。<br>
             「何ができるか」を具体的に。
           </div>
-          <div class="badges" id="badges-display">
-            <div class="badge">高速</div>
-            <div class="badge">シンプル</div>
-            <div class="badge">オフライン対応</div>
-          </div>
         </div>
 
         <div class="stage">
-          <div class="frame">
+          <div class="frame" id="device-frame">
             <div class="preview-image-placeholder" id="image-placeholder">スクリーンショットを選択してください</div>
             <img id="preview-image" class="preview-image" style="display: none;" alt="App UI screenshot">
           </div>
+        </div>
+
+        <div class="badges" id="badges-display">
+          <div class="badge">高速</div>
+          <div class="badge">シンプル</div>
+          <div class="badge">オフライン対応</div>
         </div>
       </div>
     </div>
@@ -850,8 +905,10 @@
     const kickerInput = document.getElementById('kicker');
     const titleInput = document.getElementById('title');
     const subtitleInput = document.getElementById('subtitle');
-    const screenshotInput = document.getElementById('screenshot');
-    const fileLabel = document.getElementById('file-label');
+    const screenshotIphoneInput = document.getElementById('screenshot-iphone');
+    const screenshotIpadInput = document.getElementById('screenshot-ipad');
+    const fileLabelIphone = document.getElementById('file-label-iphone');
+    const fileLabelIpad = document.getElementById('file-label-ipad');
     const downloadBtn = document.getElementById('download-btn');
     const downloadAllBtn = document.getElementById('download-all-btn');
     const addBadgeBtn = document.getElementById('add-badge');
@@ -881,6 +938,21 @@
     const badgesDisplay = document.getElementById('badges-display');
     const previewImage = document.getElementById('preview-image');
     const imagePlaceholder = document.getElementById('image-placeholder');
+    const deviceFrame = document.getElementById('device-frame');
+
+    // iPad のとき、読み込んだ画像の縦横比をフレームに反映する（潰さない）
+    function applyFrameAspectRatioFromImage() {
+      if (!deviceFrame) return;
+      if (currentDevice !== 'ipad') {
+        deviceFrame.style.aspectRatio = '';
+        return;
+      }
+      if (previewImage.src && previewImage.naturalWidth > 0 && previewImage.naturalHeight > 0) {
+        deviceFrame.style.aspectRatio = String(previewImage.naturalWidth / previewImage.naturalHeight);
+      } else {
+        deviceFrame.style.aspectRatio = '';
+      }
+    }
 
     // スライドデータの初期化
     function initSlides() {
@@ -898,8 +970,8 @@
     function getDeviceSize(device, orientation) {
       if (device === 'ipad') {
         return orientation === 'landscape' 
-          ? { width: 2732, height: 2048 }
-          : { width: 2048, height: 2732 };
+          ? { width: 2752, height: 2064 }
+          : { width: 2064, height: 2752 };
       } else { // iphone
         return orientation === 'landscape'
           ? { width: 2778, height: 1284 }
@@ -917,6 +989,8 @@
         title: "一瞬で<br>価値が伝わる",
         subtitle: "ここに短い説明文（1〜2行）。<br>「何ができるか」を具体的に。",
         image: null,
+        imageIphone: null,
+        imageIpad: null,
         badges: ["高速", "シンプル", "オフライン対応"]
       };
     }
@@ -924,6 +998,9 @@
     // 現在のスライドデータを取得
     function getCurrentSlideData() {
       const orientation = shot.classList.contains('landscape') ? 'landscape' : 'portrait';
+      const slide = slides[currentSlideIndex];
+      const imageIphone = currentDevice === 'iphone' ? (previewImage.src || null) : (slide?.imageIphone ?? slide?.image ?? null);
+      const imageIpad = currentDevice === 'ipad' ? (previewImage.src || null) : (slide?.imageIpad ?? slide?.image ?? null);
       return {
         device: currentDevice,
         orientation: orientation,
@@ -931,6 +1008,8 @@
         title: titleInput.value || '',
         subtitle: subtitleInput.value || '',
         image: previewImage.src || null,
+        imageIphone: imageIphone,
+        imageIpad: imageIpad,
         badges: Array.from(badgeInputsContainer.querySelectorAll('.badge-input'))
           .map(input => input.value.trim())
           .filter(v => v)
@@ -939,15 +1018,18 @@
 
     // デバイスサイズの切り替え
     function setDevice(device, skipSave = false) {
+      if (!skipSave) {
+        saveCurrentSlide();
+      }
       currentDevice = device;
       const orientation = shot.classList.contains('landscape') ? 'landscape' : 'portrait';
       const size = getDeviceSize(device, orientation);
       
       // CSS変数を更新
-      document.documentElement.style.setProperty('--w-portrait', device === 'ipad' ? '2048px' : '1284px');
-      document.documentElement.style.setProperty('--h-portrait', device === 'ipad' ? '2732px' : '2778px');
-      document.documentElement.style.setProperty('--w-landscape', device === 'ipad' ? '2732px' : '2778px');
-      document.documentElement.style.setProperty('--h-landscape', device === 'ipad' ? '2048px' : '1284px');
+      document.documentElement.style.setProperty('--w-portrait', device === 'ipad' ? '2064px' : '1284px');
+      document.documentElement.style.setProperty('--h-portrait', device === 'ipad' ? '2752px' : '2778px');
+      document.documentElement.style.setProperty('--w-landscape', device === 'ipad' ? '2752px' : '2778px');
+      document.documentElement.style.setProperty('--h-landscape', device === 'ipad' ? '2064px' : '1284px');
       
       // ボタンの状態を更新
       if (device === 'ipad') {
@@ -957,12 +1039,16 @@
         deviceIpadBtn.classList.remove('active');
         deviceIphoneBtn.classList.add('active');
       }
+
+      // デバイス別クラスを付与（iPad の配置調整用）
+      shot.classList.toggle('device-ipad', device === 'ipad');
+      shot.classList.toggle('device-iphone', device === 'iphone');
       
       // サイズを更新
       updateShotSize(orientation);
-      if (!skipSave) {
-        saveCurrentSlide();
-      }
+      // 切り替え先デバイスの画像をプレビューに表示
+      updatePreviewImageForCurrentDevice();
+      updateScreenshotFileLabels();
     }
 
     // ショットのサイズを更新
@@ -970,6 +1056,36 @@
       const size = getDeviceSize(currentDevice, orientation);
       shot.style.width = size.width + 'px';
       shot.style.height = size.height + 'px';
+    }
+
+    // 現在デバイス用の画像をプレビューに表示
+    function updatePreviewImageForCurrentDevice() {
+      const slide = slides[currentSlideIndex];
+      if (!slide) return;
+      const imageSrc = currentDevice === 'ipad' ? (slide.imageIpad ?? slide.image) : (slide.imageIphone ?? slide.image);
+      if (imageSrc) {
+        previewImage.src = imageSrc;
+        previewImage.style.display = 'block';
+        imagePlaceholder.style.display = 'none';
+        if (previewImage.complete) applyFrameAspectRatioFromImage();
+      } else {
+        previewImage.src = '';
+        previewImage.style.display = 'none';
+        imagePlaceholder.style.display = 'flex';
+        applyFrameAspectRatioFromImage();
+      }
+    }
+
+    // スクリーンショット用ファイル選択ラベルの表示を更新
+    function updateScreenshotFileLabels() {
+      const slide = slides[currentSlideIndex];
+      if (!slide) return;
+      const hasIphone = !!(slide.imageIphone ?? slide.image);
+      const hasIpad = !!(slide.imageIpad ?? slide.image);
+      fileLabelIphone.textContent = hasIphone ? '画像が設定されています' : '画像を選択';
+      fileLabelIphone.classList.toggle('has-file', hasIphone);
+      fileLabelIpad.textContent = hasIpad ? '画像が設定されています' : '画像を選択';
+      fileLabelIpad.classList.toggle('has-file', hasIpad);
     }
 
     // 向きの切り替え
@@ -1018,20 +1134,21 @@
         addBadgeInput('');
       }
 
-      // 画像の更新
-      if (slide.image) {
-        previewImage.src = slide.image;
+      // 画像の更新（デバイス別: imageIphone / imageIpad、旧データは image にフォールバック）
+      const imageSrc = (slide.device || currentDevice) === 'ipad'
+        ? (slide.imageIpad ?? slide.image)
+        : (slide.imageIphone ?? slide.image);
+      if (imageSrc) {
+        previewImage.src = imageSrc;
         previewImage.style.display = 'block';
         imagePlaceholder.style.display = 'none';
-        fileLabel.textContent = '画像が設定されています';
-        fileLabel.classList.add('has-file');
       } else {
         previewImage.src = '';
         previewImage.style.display = 'none';
         imagePlaceholder.style.display = 'flex';
-        fileLabel.textContent = '画像を選択';
-        fileLabel.classList.remove('has-file');
       }
+      updateScreenshotFileLabels();
+      if (previewImage.complete) applyFrameAspectRatioFromImage();
 
       // 表示の更新
       updateDisplay();
@@ -1168,22 +1285,50 @@
       saveCurrentSlide();
     });
 
-    // 画像選択
-    screenshotInput.addEventListener('change', (e) => {
+    // 画像選択（iPhone用）
+    screenshotIphoneInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
         reader.onload = (event) => {
-          previewImage.src = event.target.result;
-          previewImage.style.display = 'block';
-          imagePlaceholder.style.display = 'none';
-          fileLabel.textContent = file.name;
-          fileLabel.classList.add('has-file');
+          const dataUrl = event.target.result;
+          if (slides[currentSlideIndex]) slides[currentSlideIndex].imageIphone = dataUrl;
+          if (currentDevice === 'iphone') {
+            previewImage.src = dataUrl;
+            previewImage.style.display = 'block';
+            imagePlaceholder.style.display = 'none';
+          }
+          updateScreenshotFileLabels();
           saveCurrentSlide();
         };
         reader.readAsDataURL(file);
       }
+      e.target.value = '';
     });
+
+    // 画像選択（iPad用）
+    screenshotIpadInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target.result;
+          if (slides[currentSlideIndex]) slides[currentSlideIndex].imageIpad = dataUrl;
+          if (currentDevice === 'ipad') {
+            previewImage.src = dataUrl;
+            previewImage.style.display = 'block';
+            imagePlaceholder.style.display = 'none';
+          }
+          updateScreenshotFileLabels();
+          saveCurrentSlide();
+        };
+        reader.readAsDataURL(file);
+      }
+      e.target.value = '';
+    });
+
+    // 画像読み込み完了時に縦横比をフレームに反映（iPad・縦横比を潰さない）
+    previewImage.addEventListener('load', applyFrameAspectRatioFromImage);
 
     // バッジの追加
     addBadgeBtn.addEventListener('click', () => {
@@ -1396,7 +1541,7 @@
         const canvas = await html2canvas(shot, {
           width: size.width,
           height: size.height,
-          scale: 2,
+          scale: 1,
           useCORS: true,
           logging: false,
           backgroundColor: '#0b1020'
@@ -1434,7 +1579,7 @@
           const canvas = await html2canvas(shot, {
             width: size.width,
             height: size.height,
-            scale: 2,
+            scale: 1,
             useCORS: true,
             logging: false,
             backgroundColor: '#0b1020'
