@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Apple審査用画像ジェネレーター</title>
   <style>
-    /* ---- canvas size: iPhone 6.5" (1284x2778 portrait, 2778x1284 landscape) / iPad 12.9" (2064x2752 portrait, 2752x2064 landscape) ---- */
+    /* ---- canvas size: iPhone (1242x2688 portrait, 2688x1242 landscape) / iPad 12.9" (2064x2752 portrait, 2752x2064 landscape) ---- */
     :root {
-      --w-portrait: 1284px;
-      --h-portrait: 2778px;
-      --w-landscape: 2778px;
-      --h-landscape: 1284px;
+      --w-portrait: 1242px;
+      --h-portrait: 2688px;
+      --w-landscape: 2688px;
+      --h-landscape: 1242px;
 
       /* layout knobs */
       --pad-x: 96px;
@@ -782,7 +782,7 @@
         <div style="margin-top: 8px; padding: 10px; background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 6px; font-size: 12px; color: rgba(255, 255, 255, 0.8); line-height: 1.5;">
           <strong>⚠️ 横向きゲームについて</strong><br>
           • 横向き画像は横向きのままApp Storeにアップロードできます<br>
-          • iPhone: 2778×1284px / iPad: 2732×2048px<br>
+          • iPhone: 2688×1242px / iPad: 2732×2048px<br>
           • ただし、検索結果やサムネイルでは縦向きの枠に収まって表示されることがあります<br>
           • <strong>最初のスクリーンショット</strong>は検索結果で表示されるため、縦向きも混ぜることを推奨します<br>
           • 横向き画像は3分割されませんが、縦向きの枠内に縮小表示される可能性があります
@@ -821,7 +821,7 @@
         <div style="margin-top: 6px; font-size: 11px; color: rgba(255, 255, 255, 0.6); line-height: 1.4;">
           💡 iPhoneとiPadで別々の画像を設定できます（任意のサイズでOK・自動調整）<br>
           📦 保存される画像サイズ（App Store用）:<br>
-          &nbsp;&nbsp;iPhone: 縦向き 1284×2778px / 横向き 2778×1284px<br>
+          &nbsp;&nbsp;iPhone: 縦向き 1242×2688px / 横向き 2688×1242px<br>
           &nbsp;&nbsp;iPad: 縦向き 2064×2752px / 横向き 2752×2064px<br>
           💾 画像はbase64データとして保存されるため、元のファイルを削除しても問題ありません<br>
           ⚠️ ただし、LocalStorageの容量制限（約5-10MB）に注意してください
@@ -969,13 +969,13 @@
     // デバイスサイズに応じたサイズを取得
     function getDeviceSize(device, orientation) {
       if (device === 'ipad') {
-        return orientation === 'landscape' 
+        return orientation === 'landscape'
           ? { width: 2752, height: 2064 }
           : { width: 2064, height: 2752 };
       } else { // iphone
         return orientation === 'landscape'
-          ? { width: 2778, height: 1284 }
-          : { width: 1284, height: 2778 };
+          ? { width: 2688, height: 1242 }
+          : { width: 1242, height: 2688 };
       }
     }
 
@@ -1026,10 +1026,10 @@
       const size = getDeviceSize(device, orientation);
       
       // CSS変数を更新
-      document.documentElement.style.setProperty('--w-portrait', device === 'ipad' ? '2064px' : '1284px');
-      document.documentElement.style.setProperty('--h-portrait', device === 'ipad' ? '2752px' : '2778px');
-      document.documentElement.style.setProperty('--w-landscape', device === 'ipad' ? '2752px' : '2778px');
-      document.documentElement.style.setProperty('--h-landscape', device === 'ipad' ? '2064px' : '1284px');
+      document.documentElement.style.setProperty('--w-portrait', device === 'ipad' ? '2064px' : '1242px');
+      document.documentElement.style.setProperty('--h-portrait', device === 'ipad' ? '2752px' : '2688px');
+      document.documentElement.style.setProperty('--w-landscape', device === 'ipad' ? '2752px' : '2688px');
+      document.documentElement.style.setProperty('--h-landscape', device === 'ipad' ? '2064px' : '1242px');
       
       // ボタンの状態を更新
       if (device === 'ipad') {
