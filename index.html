@@ -674,10 +674,14 @@
       overflow: hidden;
     }
 
-    /* iPad のときは画像の実寸比でフレームを決める（JS で aspect-ratio をセット） */
+    /* iPhone / iPad とも画像の実寸比でフレームを決める（JS で aspect-ratio をセット＝解像度を正しく表示） */
+    .shot.device-iphone.portrait .frame,
     .shot.device-ipad.portrait .frame {
       height: 100%;
       width: auto;
+      max-height: 100%;
+    }
+    .shot.device-ipad.portrait .frame {
       border-radius: 72px;
     }
 
@@ -940,13 +944,9 @@
     const imagePlaceholder = document.getElementById('image-placeholder');
     const deviceFrame = document.getElementById('device-frame');
 
-    // iPad のとき、読み込んだ画像の縦横比をフレームに反映する（潰さない）
+    // iPhone / iPad とも、読み込んだ画像の縦横比をフレームに反映する（解像度・比率を潰さない）
     function applyFrameAspectRatioFromImage() {
       if (!deviceFrame) return;
-      if (currentDevice !== 'ipad') {
-        deviceFrame.style.aspectRatio = '';
-        return;
-      }
       if (previewImage.src && previewImage.naturalWidth > 0 && previewImage.naturalHeight > 0) {
         deviceFrame.style.aspectRatio = String(previewImage.naturalWidth / previewImage.naturalHeight);
       } else {
